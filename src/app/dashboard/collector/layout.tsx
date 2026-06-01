@@ -83,17 +83,15 @@ export default function CollectorDashboardLayout({
             </Link>
 
             <DropdownMenu>
-              <DropdownMenuTrigger>
-                <Button variant="ghost" className="flex items-center gap-2 h-8 px-2">
-                  <Avatar size="sm">
-                    {user?.image && <AvatarImage src={user.image} />}
-                    <AvatarFallback>{initials}</AvatarFallback>
-                  </Avatar>
-                  <span className="hidden sm:inline text-sm font-medium max-w-[120px] truncate">
-                    {user?.name || "Collecteur"}
-                  </span>
-                  <ChevronDown className="size-3.5 text-muted-foreground" />
-                </Button>
+              <DropdownMenuTrigger render={<Button variant="ghost" className="flex items-center gap-2 h-8 px-2" />}>
+                <Avatar size="sm">
+                  {user?.image && <AvatarImage src={user.image} />}
+                  <AvatarFallback>{initials}</AvatarFallback>
+                </Avatar>
+                <span className="hidden sm:inline text-sm font-medium max-w-[120px] truncate">
+                  {user?.name || "Collecteur"}
+                </span>
+                <ChevronDown className="size-3.5 text-muted-foreground" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuGroup>

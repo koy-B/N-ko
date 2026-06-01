@@ -24,6 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogClose,
+  DialogTrigger,
 } from "@/components/ui/dialog"
 import {
   Select,
@@ -41,8 +42,11 @@ import {
   Package,
   Image as ImageIcon,
   AlertTriangle,
+  Loader2,
+  Upload as UploadIcon,
 } from "lucide-react"
 import { cn, formatPrice, formatNumber } from "@/lib/utils"
+import { uploadImage } from "@/actions/upload"
 
 type Product = {
   id: string
@@ -95,6 +99,7 @@ const defaultForm = {
   weight: "",
   dimensions: "",
   colors: "",
+  image: "",
 }
 
 export default function AdminProductsPage() {
@@ -105,9 +110,34 @@ export default function AdminProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null)
   const [formData, setFormData] = useState(defaultForm)
+  const [uploading, setUploading] = useState(false)
 
   function resetForm() {
     setFormData(defaultForm)
+  }
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Preview locale immédiate
+    const localUrl = URL.createObjectURL(file)
+    setFormData((prev) => ({ ...prev, image: localUrl }))
+
+    setUploading(true)
+    const uploadFormData = new FormData()
+    uploadFormData.append("file", file)
+
+    try {
+      const res = await uploadImage(uploadFormData)
+      if (res.success && res.url) {
+        setFormData((prev) => ({ ...prev, image: res.url! }))
+      }
+    } catch (error) {
+      console.error("Upload failed", error)
+    } finally {
+      setUploading(false)
+    }
   }
 
   function handleAdd() {
@@ -123,7 +153,7 @@ export default function AdminProductsPage() {
       dimensions: formData.dimensions,
       colors: formData.colors.split(",").map((c) => c.trim()).filter(Boolean),
       isActive: true,
-      image: "/images/products/placeholder.jpg",
+      image: formData.image || "/images/products/placeholder.jpg",
     }
     setProducts([newProduct, ...products])
     resetForm()
@@ -142,6 +172,7 @@ export default function AdminProductsPage() {
       weight: String(product.weight),
       dimensions: product.dimensions,
       colors: product.colors.join(", "),
+      image: product.image,
     })
     setEditOpen(true)
   }
@@ -162,6 +193,7 @@ export default function AdminProductsPage() {
               weight: parseFloat(formData.weight) || 0,
               dimensions: formData.dimensions,
               colors: formData.colors.split(",").map((c) => c.trim()).filter(Boolean),
+              image: formData.image,
             }
           : p
       )
@@ -197,11 +229,11 @@ export default function AdminProductsPage() {
           </p>
         </div>
         <Dialog open={addOpen} onOpenChange={setAddOpen}>
-          <DialogClose render={<Button className="gap-2" />}>
+          <DialogTrigger render={<Button className="gap-2" />}>
             <Plus className="size-4" />
             Ajouter un produit
-          </DialogClose>
-          <DialogContent className="sm:max-w-lg">
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Nouveau produit</DialogTitle>
               <DialogDescription>
@@ -209,6 +241,60 @@ export default function AdminProductsPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="grid grid-cols-2 gap-4 py-2">
+              <div className="flex flex-col gap-2 col-span-2">
+                <label className="text-sm font-medium">Image du produit</label>
+                <div className="flex gap-4 items-start">
+                  <div className="size-24 rounded-lg border bg-muted/30 flex items-center justify-center shrink-0 overflow-hidden relative">
+                    {uploading ? (
+                      <div className="absolute inset-0 flex items-center justify-center bg-background/50">
+                        <Loader2 className="size-6 animate-spin text-primary" />
+                      </div>
+                    ) : null}
+                    {formData.image ? (
+                      <img 
+                        key={formData.image}
+                        src={formData.image} 
+                        alt="Preview" 
+                        className="size-full object-cover"
+                        onError={() => {
+                          console.error("Failed to load image preview:", formData.image);
+                          // On ne reset plus l'image immédiatement pour laisser une chance à la preview locale
+                          // ou à l'utilisateur de corriger l'URL
+                        }}
+                      />
+                    ) : (
+                      <ImageIcon className="size-8 text-muted-foreground" />
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-3">
+                    <div className="flex flex-col gap-1.5">
+                      <p className="text-xs text-muted-foreground">Importer une image</p>
+                      <Input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handleFileUpload} 
+                        disabled={uploading}
+                        className="text-xs h-9 cursor-pointer" 
+                      />
+                    </div>
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t" />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-background px-2 text-muted-foreground">OU URL</span>
+                      </div>
+                    </div>
+                    <Input 
+                      value={formData.image} 
+                      onChange={(e) => setFormData({ ...formData, image: e.target.value })} 
+                      placeholder="https://..." 
+                      className="text-xs"
+                      disabled={uploading}
+                    />
+                  </div>
+                </div>
+              </div>
               <div className="flex flex-col gap-2 col-span-2">
                 <label className="text-sm font-medium">Nom</label>
                 <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Nom du produit" />
@@ -257,7 +343,7 @@ export default function AdminProductsPage() {
             </div>
             <DialogFooter showCloseButton>
               <DialogClose render={<Button variant="outline" />}>Annuler</DialogClose>
-              <Button onClick={handleAdd} disabled={!formData.name || !formData.slug || !formData.price || !formData.category}>Créer le produit</Button>
+              <Button onClick={handleAdd} disabled={!formData.name || !formData.slug || !formData.price || !formData.category || uploading}>Créer le produit</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -345,7 +431,7 @@ export default function AdminProductsPage() {
       </motion.div>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Modifier le produit</DialogTitle>
             <DialogDescription>
@@ -353,6 +439,60 @@ export default function AdminProductsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-4 py-2">
+            <div className="flex flex-col gap-2 col-span-2">
+              <label className="text-sm font-medium">Image du produit</label>
+              <div className="flex gap-4 items-start">
+                <div className="size-24 rounded-lg border bg-muted/30 flex items-center justify-center shrink-0 overflow-hidden relative">
+                  {uploading ? (
+                    <div className="absolute inset-0 flex items-center justify-center bg-background/50">
+                      <Loader2 className="size-6 animate-spin text-primary" />
+                    </div>
+                  ) : null}
+                  {formData.image ? (
+                    <img 
+                      key={formData.image}
+                      src={formData.image} 
+                      alt="Preview" 
+                      className="size-full object-cover"
+                      onError={() => {
+                        console.error("Failed to load image preview:", formData.image);
+                        // On ne reset plus l'image immédiatement pour laisser une chance à la preview locale
+                        // ou à l'utilisateur de corriger l'URL
+                      }}
+                    />
+                  ) : (
+                    <ImageIcon className="size-8 text-muted-foreground" />
+                  )}
+                </div>
+                <div className="flex-1 space-y-3">
+                  <div className="flex flex-col gap-1.5">
+                    <p className="text-xs text-muted-foreground">Modifier l'image</p>
+                    <Input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={handleFileUpload} 
+                      disabled={uploading}
+                      className="text-xs h-9 cursor-pointer" 
+                    />
+                  </div>
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-background px-2 text-muted-foreground">OU URL</span>
+                    </div>
+                  </div>
+                  <Input 
+                    value={formData.image} 
+                    onChange={(e) => setFormData({ ...formData, image: e.target.value })} 
+                    placeholder="https://..." 
+                    className="text-xs"
+                    disabled={uploading}
+                  />
+                </div>
+              </div>
+            </div>
             <div className="flex flex-col gap-2 col-span-2">
               <label className="text-sm font-medium">Nom</label>
               <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
@@ -401,7 +541,7 @@ export default function AdminProductsPage() {
           </div>
           <DialogFooter showCloseButton>
             <DialogClose render={<Button variant="outline" />}>Annuler</DialogClose>
-            <Button onClick={handleEdit}>Enregistrer</Button>
+            <Button onClick={handleEdit} disabled={uploading}>Enregistrer</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
