@@ -9,22 +9,13 @@ if (typeof window === "undefined") {
 }
 
 const createPrismaClient = () => {
-  const connectionString = process.env.DATABASE_URL
+  // FORCE DATABASE URL FOR DEBUGGING
+  const connectionString = "postgresql://neondb_owner:npg_qaMX29lhgGYV@ep-jolly-paper-aqqds94t-pooler.c-8.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
 
-  if (!connectionString) {
-    console.error("CRITICAL: DATABASE_URL is missing from environment variables.")
-    return new PrismaClient()
-  }
-
-  // Si c'est une URL Neon (contient neon.tech)
-  if (connectionString.includes("neon.tech")) {
-    const pool = new Pool({ connectionString })
-    const adapter = new PrismaNeon(pool as any)
-    return new PrismaClient({ adapter })
-  }
-
-  // Fallback standard (pour le dev local avec SQLite par exemple)
-  return new PrismaClient()
+  console.log("Using hardcoded connection string for Neon")
+  const pool = new Pool({ connectionString })
+  const adapter = new PrismaNeon(pool as any)
+  return new PrismaClient({ adapter })
 }
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient }
