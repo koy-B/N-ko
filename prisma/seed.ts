@@ -1,11 +1,31 @@
 import { PrismaClient } from "@prisma/client"
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3"
+import { PrismaNeon } from "@prisma/adapter-neon"
+import { Pool, neonConfig } from "@neondatabase/serverless"
 import { hash } from "bcryptjs"
+import ws from "ws"
 
-const adapter = new PrismaBetterSqlite3({ url: "file:./dev.db" })
-const prisma = new PrismaClient({ adapter })
+// Configuration WebSockets pour le seed (Node.js)
+neonConfig.webSocketConstructor = ws
+
+const connectionString = process.env.DATABASE_URL
+
+if (!connectionString) {
+  throw new Error("DATABASE_URL is not defined for seeding.")
+}
+
+const createPrisma = () => {
+  if (connectionString.includes("neon.tech")) {
+    const pool = new Pool({ connectionString })
+    const adapter = new PrismaNeon(pool as any)
+    return new PrismaClient({ adapter })
+  }
+  return new PrismaClient()
+}
+
+const prisma = createPrisma()
 
 async function main() {
+  console.log("Starting seed...")
   const adminPassword = await hash("Admin123!", 12)
 
   const admin = await prisma.user.upsert({
