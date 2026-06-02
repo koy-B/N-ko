@@ -8,7 +8,11 @@ if (typeof window === "undefined") {
   neonConfig.webSocketConstructor = ws
 }
 
-const connectionString = process.env.DATABASE_URL || ""
+const connectionString = process.env.DATABASE_URL
+
+if (!connectionString) {
+  throw new Error("DATABASE_URL is not defined in the environment variables. Please check your .env.local or Vercel settings.")
+}
 
 const pool = new Pool({ connectionString })
 // On utilise 'any' ici pour éviter l'erreur de type spécifique au driver adapter dans certaines versions de TS/Prisma
